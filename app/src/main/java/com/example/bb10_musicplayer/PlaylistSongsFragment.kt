@@ -35,7 +35,7 @@ class PlaylistSongsFragment : Fragment() {
         loadSongs()
 
         adapter = SongAdapter(playlistSongs, { position ->
-            (activity as? MainActivity)?.playSong(position)
+            (activity as? MainActivity)?.playSongsList(playlistSongs, position)
         }, { song ->
             (activity as? MainActivity)?.showSongOptions(song)
         })
@@ -79,6 +79,7 @@ class PlaylistSongsFragment : Fragment() {
             .setPositiveButton("Done") { _, _ ->
                 loadSongs()
                 adapter.updateSongs(playlistSongs)
+                (activity as? MainActivity)?.savePlaylists()
             }
             .show()
     }
@@ -86,5 +87,6 @@ class PlaylistSongsFragment : Fragment() {
     private fun shuffleSongs() {
         playlistSongs.shuffle()
         adapter.updateSongs(playlistSongs)
+        (activity as? MainActivity)?.playSongsList(playlistSongs, 0)
     }
 }

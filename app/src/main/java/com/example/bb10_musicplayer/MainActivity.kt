@@ -63,11 +63,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initial mock data if empty
-        if (playlists.isEmpty()) {
-            playlists.add(Playlist(1, "Hello"))
-            playlists.add(Playlist(2, "Favorites"))
-        }
+        loadPlaylists()
 
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -132,6 +128,34 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         startSeekBarUpdate()
     }
 
+    private fun loadPlaylists() {
+        val prefs = getSharedPreferences("playlists_prefs", Context.MODE_PRIVATE)
+        val playlistNames = prefs.getStringSet("playlist_names", null) ?: setOf("Hello", "Favorites")
+        
+        playlists.clear()
+        playlistNames.forEach { name ->
+            val id = prefs.getLong("playlist_id_$name", System.currentTimeMillis())
+            val songsStr = prefs.getString("playlist_songs_$name", "") ?: ""
+            val songsList = if (songsStr.isEmpty()) mutableListOf<Long>() else songsStr.split(",").map { it.toLong() }.toMutableList()
+            val dateCreated = prefs.getLong("playlist_date_$name", System.currentTimeMillis())
+            playlists.add(Playlist(id, name, songsList, dateCreated))
+        }
+    }
+
+    fun savePlaylists() {
+        val prefs = getSharedPreferences("playlists_prefs", Context.MODE_PRIVATE)
+        val editor = prefs.edit()
+        val names = playlists.map { it.name }.toSet()
+        editor.putStringSet("playlist_names", names)
+        
+        playlists.forEach { playlist ->
+            editor.putLong("playlist_id_${playlist.name}", playlist.id)
+            editor.putString("playlist_songs_${playlist.name}", playlist.songs.joinToString(","))
+            editor.putLong("playlist_date_${playlist.name}", playlist.dateCreated)
+        }
+        editor.apply()
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
         val tag = fragment?.tag
@@ -185,6 +209,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     fun createPlaylist(name: String) {
         val id = (playlists.maxByOrNull { it.id }?.id ?: 0) + 1
         playlists.add(Playlist(id, name))
+        savePlaylists()
     }
 
     fun getPlaylists(): MutableList<Playlist> = playlists
@@ -205,11 +230,18 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun updateHomeFragment() {
         val homeFragment = supportFragmentManager.findFragmentByTag("HOME") as? HomeFragment
         homeFragment?.setSongs(songList) { position ->
-            playSong(position)
+            playSongsList(songList, position)
         }
     }
 
     fun playSong(position: Int) {
+        musicService?.setSong(position)
+        musicService?.playSong()
+        btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
+    }
+
+    fun playSongsList(list: List<Song>, position: Int) {
+        musicService?.setList(list)
         musicService?.setSong(position)
         musicService?.playSong()
         btnPlayPause.setImageResource(android.R.drawable.ic_media_pause)
@@ -355,6 +387,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 val selectedPlaylist = playlists[which]
                 if (!selectedPlaylist.songs.contains(song.id)) {
                     selectedPlaylist.songs.add(song.id)
+                    savePlaylists()
                     Toast.makeText(this, "Added to ${selectedPlaylist.name}", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Already in ${selectedPlaylist.name}", Toast.LENGTH_SHORT).show()
