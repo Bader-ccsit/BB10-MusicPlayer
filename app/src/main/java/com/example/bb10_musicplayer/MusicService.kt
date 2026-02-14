@@ -1,6 +1,10 @@
 package com.example.bb10_musicplayer
 
+import android.app.Notification
+import android.app.PendingIntent
 import android.app.Service
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -12,36 +16,27 @@ import android.media.AudioAttributes
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.core.app.NotificationCompat
+import androidx.media.session.MediaButtonReceiver
 
-class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener {
+class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener, AudioManager.OnAudioFocusChangeListener {
 
     private var player: MediaPlayer? = null
     private var songs: List<Song>? = null
     private var songPos = 0
     private val musicBind = MusicBinder()
     private var mediaSession: MediaSessionCompat? = null
+    private lateinit var audioManager: AudioManager
+    private lateinit var mediaButtonReceiverComponent: ComponentName
 
     override fun onCreate() {
         super.onCreate()
         songPos = 0
-        initMusicPlayer()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        mediaButtonReceiverComponent = ComponentName(this, MediaButtonReceiver::class.java)
         
-        try {
-            mediaSession = MediaSessionCompat(this, "BeatBerryService").apply {
-                @Suppress("DEPRECATION")
-                setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
-                setCallback(object : MediaSessionCompat.Callback() {
-                    override fun onPlay() { go() }
-                    override fun onPause() { pausePlayer() }
-                    override fun onSkipToNext() { playNext() }
-                    override fun onSkipToPrevious() { playPrev() }
-                    override fun onSeekTo(pos: Long) { seek(pos.toInt()) }
-                })
-                isActive = true
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        initMusicPlayer()
+        initMediaSession()
     }
 
     private fun initMusicPlayer() {
@@ -65,8 +60,74 @@ class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnEr
         }
     }
 
+    private fun initMediaSession() {
+        try {
+            mediaSession = MediaSessionCompat(this, "BeatBerryService", mediaButtonReceiverComponent, null).apply {
+                @Suppress("DEPRECATION")
+                setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
+                
+                val mediaButtonIntent = Intent(Intent.ACTION_MEDIA_BUTTON)
+                mediaButtonIntent.component = mediaButtonReceiverComponent
+                val buttonPendingIntent = PendingIntent.getBroadcast(this@MusicService, 0, mediaButtonIntent, 0)
+                setMediaButtonReceiver(buttonPendingIntent)
+
+                setCallback(object : MediaSessionCompat.Callback() {
+                    override fun onPlay() { go() }
+                    override fun onPause() { pausePlayer() }
+                    override fun onSkipToNext() { playNext() }
+                    override fun onSkipToPrevious() { playPrev() }
+                    override fun onSeekTo(pos: Long) { seek(pos.toInt()) }
+                    override fun onStop() { pausePlayer() }
+                })
+                isActive = true
+            }
+            
+            @Suppress("DEPRECATION")
+            audioManager.registerMediaButtonEventReceiver(mediaButtonReceiverComponent)
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        MediaButtonReceiver.handleIntent(mediaSession, intent)
         return START_STICKY
+    }
+
+    override fun onAudioFocusChange(focusChange: Int) {
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                if (isPng()) pausePlayer()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                player?.setVolume(0.1f, 0.1f)
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                player?.setVolume(1.0f, 1.0f)
+                go()
+            }
+        }
+    }
+
+    private fun buildNotification(song: Song): Notification {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(this, 0, intent, 0)
+
+        return NotificationCompat.Builder(this, "BEATBERRY_CHANNEL")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(song.title)
+            .setContentText(song.artist)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
+                .setMediaSession(mediaSession?.sessionToken)
+                .setShowActionsInCompactView(0, 1, 2))
+            .addAction(android.R.drawable.ic_media_previous, "Previous", MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS))
+            .addAction(if (isPng()) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, "Play/Pause", MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_PLAY_PAUSE))
+            .addAction(android.R.drawable.ic_media_next, "Next", MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_SKIP_TO_NEXT))
+            .build()
     }
 
     fun setList(theSongs: List<Song>) {
@@ -82,19 +143,30 @@ class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnEr
     }
 
     override fun onUnbind(intent: Intent): Boolean {
+        return true
+    }
+
+    override fun onDestroy() {
+        @Suppress("DEPRECATION")
+        audioManager.unregisterMediaButtonEventReceiver(mediaButtonReceiverComponent)
         player?.stop()
         player?.release()
         mediaSession?.release()
-        return false
+        super.onDestroy()
     }
 
     fun playSong() {
+        @Suppress("DEPRECATION")
+        val result = audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return
+
         player?.reset()
         val playSong = songs?.getOrNull(songPos) ?: return
         
         try {
             player?.setDataSource(applicationContext, playSong.uri)
             updateMetadata(playSong)
+            startForeground(1, buildNotification(playSong))
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -118,6 +190,7 @@ class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnEr
     override fun onPrepared(mp: MediaPlayer) {
         mp.start()
         updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+        songs?.getOrNull(songPos)?.let { startForeground(1, buildNotification(it)) }
     }
 
     override fun onCompletion(mp: MediaPlayer) {
@@ -140,13 +213,20 @@ class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnEr
     fun pausePlayer() { 
         player?.pause()
         updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+        songs?.getOrNull(songPos)?.let { startForeground(1, buildNotification(it)) }
+        stopForeground(false)
     }
     
     fun seek(posn: Int) { player?.seekTo(posn) }
     
     fun go() { 
-        player?.start()
-        updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+        @Suppress("DEPRECATION")
+        val result = audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            player?.start()
+            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+            songs?.getOrNull(songPos)?.let { startForeground(1, buildNotification(it)) }
+        }
     }
     
     fun playPrev() {
@@ -162,15 +242,18 @@ class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnEr
     }
 
     private fun updatePlaybackState(state: Int) {
+        val speed = if (state == PlaybackStateCompat.STATE_PLAYING) 1.0f else 0.0f
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
                 PlaybackStateCompat.ACTION_PLAY or 
                 PlaybackStateCompat.ACTION_PAUSE or 
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or
                 PlaybackStateCompat.ACTION_SKIP_TO_NEXT or 
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_STOP or
                 PlaybackStateCompat.ACTION_SEEK_TO
             )
-            .setState(state, getPosn().toLong(), 1.0f)
+            .setState(state, getPosn().toLong(), speed)
             .build()
         mediaSession?.setPlaybackState(playbackState)
     }
