@@ -27,7 +27,8 @@ class MusicService : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.OnEr
         initMusicPlayer()
         
         try {
-            mediaSession = MediaSessionCompat(this, "MusicService").apply {
+            mediaSession = MediaSessionCompat(this, "BeatBerryService").apply {
+                @Suppress("DEPRECATION")
                 setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
                 setCallback(object : MediaSessionCompat.Callback() {
                     override fun onPlay() { go() }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">BB10 Music Player</string>
+    <string name="app_name">BeatBerry</string>
     <string name="no_music">There is no music message</string>
     <string name="menu_create_playlist">Create a playlist</string>
     <string name="menu_view_playlists">View all playlists</string>

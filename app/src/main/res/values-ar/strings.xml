@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">مشغل موسيقى BB10</string>
+    <string name="app_name">بيت بيري</string>
     <string name="no_music">لا توجد موسيقى</string>
     <string name="menu_create_playlist">إنشاء قائمة تشغيل</string>
     <string name="menu_view_playlists">عرض جميع قوائم التشغيل</string>
