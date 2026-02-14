@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">BeatBerry</string>
+    <string name="menu_home">Home</string>
     <string name="no_music">There is no music message</string>
     <string name="menu_create_playlist">Create a playlist</string>
     <string name="menu_view_playlists">View all playlists</string>
@@ -9,7 +10,8 @@
     <string name="settings_dark_mode">Dark Mode</string>
     <string name="settings_language">Language</string>
     <string name="settings_clear_cache">Clear application cache</string>
-    <string name="about_made_by">made with love by Eng.Bader/Mihawk</string>
+    <string name="about_created_by">Created with Love by Engineer Mihawk/Bader 👨🏻‍💻🤍</string>
+    <string name="about_location">Made in Saudi Arabia, Alhasa 🇸🇦🌴</string>
     <string name="about_version">Version 1.0</string>
     <string name="rescan_message">Scanning for music...</string>
     <string name="btn_start_scanning">Start Scanning</string>

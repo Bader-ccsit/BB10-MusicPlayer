@@ -2,6 +2,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <group android:checkableBehavior="single">
         <item
+            android:id="@+id/nav_home"
+            android:icon="@android:drawable/ic_menu_today"
+            android:title="@string/menu_home" />
+        <item
             android:id="@+id/nav_create_playlist"
             android:icon="@android:drawable/ic_menu_add"
             android:title="@string/menu_create_playlist" />

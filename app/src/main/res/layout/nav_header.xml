@@ -8,17 +8,21 @@
     android:padding="16dp">
 
     <ImageView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:id="@+id/nav_header_logo"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:paddingTop="8dp"
-        android:src="@android:drawable/ic_menu_report_image" />
+        android:src="@mipmap/ic_launcher"
+        android:contentDescription="@string/app_name" />
 
     <TextView
+        android:id="@+id/nav_header_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingTop="8dp"
         android:text="@string/app_name"
         android:textColor="#FFFFFF"
-        android:textSize="14sp" />
+        android:textSize="18sp"
+        android:textStyle="bold" />
 
 </LinearLayout>

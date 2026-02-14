@@ -107,6 +107,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragment_container, fragment, tag)
             .commit()
+        
+        // If it's the home fragment, we need to ensure it's populated
+        if (tag == "HOME") {
+            handler.post { updateHomeFragment() }
+        }
     }
 
     private fun updateHomeFragment() {
@@ -205,12 +210,12 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.nav_home -> showFragment(HomeFragment(), "HOME")
             R.id.nav_create_playlist -> showFragment(CreatePlaylistFragment(), "CREATE_PLAYLIST")
             R.id.nav_view_playlists -> showFragment(PlaylistsFragment(), "PLAYLISTS")
             R.id.nav_rescan -> showFragment(RescanFragment(), "RESCAN")
             R.id.nav_settings -> showFragment(SettingsFragment(), "SETTINGS")
             R.id.nav_about -> showFragment(AboutFragment(), "ABOUT")
-            else -> showFragment(HomeFragment(), "HOME")
         }
         val drawer: DrawerLayout = findViewById(R.id.drawer_layout)
         drawer.closeDrawer(GravityCompat.START)
